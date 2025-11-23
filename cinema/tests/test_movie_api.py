@@ -141,6 +141,36 @@ class MovieViewSetTests(TestCase):
         res = self.client.get(MOVIE_URL)
         self.assertEqual(res.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
+    def test_throttle_anon_users(self):
+        anon_client = APIClient()
+        url = reverse("swagger-ui")
+        for _ in range(10):
+            anon_client.get(url)
+        res = anon_client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_anon_status_code(self):
+        anon_client = APIClient()
+        res = anon_client.get(MOVIE_URL)
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_user_status_code_permission_error(self):
+        res = self.simple_client.post(MOVIE_URL, {})
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_filter_movies(self):
+        filters = {"title": "Sample", "genres": "1,2", "actors": "1"}
+        res = self.client.get(MOVIE_URL, query_params=filters)
+        data = MovieListSerializer(
+            Movie.objects.filter(
+                title__icontains="Sample",
+                genres__in=(1, 2),
+                actors__in=(1,)
+            ),
+            many=True
+        ).data
+        self.assertEqual(res.data, data)
+
 
 class MovieImageUploadTests(TestCase):
     def setUp(self):
